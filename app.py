@@ -11,8 +11,8 @@ MODEL_PATH = os.path.join(os.path.dirname(__file__), 'linear.pkl')
 with open(MODEL_PATH, 'rb') as f:
     model = pickle.load(f)
 
-# Embedded HTML Template with Modern Slate & Emerald Color Combination
-HTML_TEMPLATE = """
+# Embedded HTML Template
+HTML_TEMPLATE = r"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -151,4 +151,106 @@ HTML_TEMPLATE = """
             padding: 16px;
             border-radius: 10px;
             background: #fef2f2;
-            border: 1.5px solid
+            border: 1.5px solid #fca5a5;
+            color: #991b1b;
+            text-align: center;
+            font-weight: 500;
+        }
+        @media (max-width: 550px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            .form-group.full-width {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Real Estate Value Predictor</h1>
+            <p>Enter property details below to estimate market value</p>
+        </div>
+        <div class="form-body">
+            <form method="POST" action="/">
+                <div class="grid">
+                    <div class="form-group">
+                        <label for="Square_Footage">Square Footage</label>
+                        <input type="number" step="any" name="Square_Footage" id="Square_Footage" placeholder="e.g. 2500" value="{{ form_data.get('Square_Footage', '') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="Num_Bedrooms">Number of Bedrooms</label>
+                        <input type="number" step="1" name="Num_Bedrooms" id="Num_Bedrooms" placeholder="e.g. 3" value="{{ form_data.get('Num_Bedrooms', '') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="Num_Bathrooms">Number of Bathrooms</label>
+                        <input type="number" step="any" name="Num_Bathrooms" id="Num_Bathrooms" placeholder="e.g. 2" value="{{ form_data.get('Num_Bathrooms', '') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="Year_Built">Year Built</label>
+                        <input type="number" step="1" name="Year_Built" id="Year_Built" placeholder="e.g. 2010" value="{{ form_data.get('Year_Built', '') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="Lot_Size">Lot Size (Acres / Sq Ft)</label>
+                        <input type="number" step="any" name="Lot_Size" id="Lot_Size" placeholder="e.g. 1.5" value="{{ form_data.get('Lot_Size', '') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="Garage_Size">Garage Size (Cars)</label>
+                        <input type="number" step="1" name="Garage_Size" id="Garage_Size" placeholder="e.g. 2" value="{{ form_data.get('Garage_Size', '') }}" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="Neighborhood_Quality">Neighborhood Quality (Rating 1 - 10)</label>
+                        <input type="number" step="1" min="1" max="10" name="Neighborhood_Quality" id="Neighborhood_Quality" placeholder="e.g. 8" value="{{ form_data.get('Neighborhood_Quality', '') }}" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-submit">Predict Property Value</button>
+            </form>
+
+            {% if prediction is not none %}
+            <div class="result-box">
+                <div class="result-label">Estimated Value</div>
+                <div class="result-value">${{ "{:,.2f}".format(prediction) }}</div>
+            </div>
+            {% endif %}
+
+            {% if error %}
+            <div class="error-box">
+                {{ error }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    prediction = None
+    error = None
+    form_data = {}
+
+    if request.method == 'POST':
+        try:
+            form_data = request.form
+            features = pd.DataFrame([{
+                'Square_Footage': float(request.form['Square_Footage']),
+                'Num_Bedrooms': float(request.form['Num_Bedrooms']),
+                'Num_Bathrooms': float(request.form['Num_Bathrooms']),
+                'Year_Built': float(request.form['Year_Built']),
+                'Lot_Size': float(request.form['Lot_Size']),
+                'Garage_Size': float(request.form['Garage_Size']),
+                'Neighborhood_Quality': float(request.form['Neighborhood_Quality'])
+            }])
+            
+            pred_value = model.predict(features)[0]
+            prediction = float(pred_value)
+        except Exception as e:
+            error = f"Prediction Error: {str(e)}"
+
+    return render_template_string(HTML_TEMPLATE, prediction=prediction, error=error, form_data=form_data)
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
